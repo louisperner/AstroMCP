@@ -6,7 +6,7 @@ import re
 from typing import Any
 
 from .. import net
-from ..util import mjd_now, rnd
+from ..util import mjd_now, rnd, sep_arcsec
 
 API = "https://api.alerce.online/ztf/v1"
 FILTERS = {1: "g", 2: "r", 3: "i"}
@@ -29,9 +29,27 @@ def _obj(o: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+# The ALeRCE API ignores the cone when ra or dec is exactly 0 and returns the first rows of the
+# whole table (checked 2026-11-03: ra=0&dec=10 and ra=10&dec=0 both give 20 unrelated objects).
+# 1e-7 deg (0.00036") is far below ZTF astrometry, so nudging zero is harmless.
+_NUDGE = 1e-7
+
+
+def _nonzero(x: float) -> float:
+    return _NUDGE if x == 0 else x
+
+
 def objects_near(ra: float, dec: float, radius_arcsec: float = 5.0) -> dict[str, Any]:
-    d = net.fetch_json(f"{API}/objects/", params={"ra": ra, "dec": dec, "radius": radius_arcsec, "page_size": 20}, timeout=30)
-    objs = [_obj(o) for o in (d.get("items") or [])]
+    params = {"ra": _nonzero(ra), "dec": _nonzero(dec), "radius": radius_arcsec, "page_size": 20}
+    d = net.fetch_json(f"{API}/objects/", params=params, timeout=30)
+    objs = []
+    for o in d.get("items") or []:
+        if o.get("meanra") is None or o.get("meandec") is None:
+            continue
+        # never trust the server's cone blindly: drop anything outside the radius (+ a margin for the mean position)
+        if sep_arcsec(ra, dec, o["meanra"], o["meandec"]) > radius_arcsec + 1:
+            continue
+        objs.append(_obj(o))
     return {"source": "ALeRCE (ZTF)", "count": len(objs), "objects": objs}
 
 

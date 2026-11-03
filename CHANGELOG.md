@@ -5,6 +5,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-03
+
+### Fixed
+
+- `ztf_objects_near` / `whats_here`: at RA = 0 or Dec = 0 (exactly) the ALeRCE API ignores the cone and
+  returns the first 20 rows of its table, so a position on the celestial equator was reported as a
+  "known ZTF alert source". Zero is now nudged by 1e-7 deg, and any row outside the radius is dropped.
+
 ## [0.1.0]
 
 - Published on PyPI as **`astro-checker`** (`astromcp` was rejected as too similar to the unrelated `astro-mcp`); commands `astro-checker` and `astromcp`. - 2026-10-25
