@@ -78,6 +78,22 @@ def test_alerce_cone(offline: FakeNet) -> None:
     assert r["objects"][0]["oid"] == "ZTF26acatcla"
 
 
+def test_alerce_zero_coordinate_is_nudged_and_far_rows_dropped(offline: FakeNet) -> None:
+    # what the live API returns for ra=0: the first rows of the table, nowhere near the position
+    far = b'{"items": [{"oid": "ZTF17aaaaaak", "meanra": 59.13, "meandec": 49.43, "ndet": 1}]}'
+    offline.add("objects/?", far)
+    r = alerce.objects_near(0.0, 0.0, 5)
+    assert r["count"] == 0
+    url = offline.calls[-1][0]
+    assert "ra=1e-07" in url and "dec=1e-07" in url
+
+
+def test_alerce_keeps_wraparound_neighbour(offline: FakeNet) -> None:
+    near = b'{"items": [{"oid": "ZTF26x", "meanra": 359.9995, "meandec": 0.0003, "ndet": 3}]}'
+    offline.add("objects/?", near)
+    assert alerce.objects_near(0.0, 0.0, 5)["objects"][0]["oid"] == "ZTF26x"
+
+
 def test_alerce_lightcurve(offline: FakeNet) -> None:
     offline.add("/lightcurve", "alerce_lightcurve.json")
     r = alerce.lightcurve("ZTF26acatcla")
